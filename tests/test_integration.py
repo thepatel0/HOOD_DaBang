@@ -97,6 +97,71 @@ class TestIntegrationPipeline(unittest.TestCase):
         self.assertGreater(n, 0)
 
 
+class FullModeTransport:
+    """Scripted LLM for the full §4.4 pipeline (insight + debate + trader + PM)."""
+    def __init__(self, bull=0.85, bear=0.30, trader="trade", pm="execute"):
+        self.bull, self.bear, self.trader, self.pm = bull, bear, trader, pm
+
+    def complete(self, model, system, messages, max_tokens, cached_tokens):
+        import json
+        if system.startswith("You are the Insight"):
+            t = json.dumps({"claim": "AAPL long to target", "mechanism": "breakout "
+                            "continuation on volume", "invalidation": ["loses VWAP"],
+                            "expected_path": "up", "confidence": 0.8})
+        elif system.startswith("You are the Bull"):
+            t = json.dumps({"confidence": self.bull, "thesis": "bull", "risks": []})
+        elif system.startswith("You are the Bear"):
+            t = json.dumps({"confidence": self.bear, "thesis": "bear", "risks": []})
+        elif system.startswith("You are the Trader"):
+            t = json.dumps({"decision": self.trader, "side": "long",
+                            "confidence": 0.78, "thesis_summary": "go",
+                            "invalidation": ["loses vwap"]})
+        else:
+            t = json.dumps({"decision": self.pm, "reason": "ok", "size_factor": 1.0})
+        return {"text": t, "input_tokens": 3000, "output_tokens": 300,
+                "cached_tokens": cached_tokens, "latency_ms": 0}
+
+
+def build_full_controller(transport):
+    from src.llm_budget import LLMBudget
+    from src.llm_client import LLMClient
+    from datetime import datetime, timezone
+    cfg = config.load()
+    reg = StrategyRegistry(regime_allocations={"bull_trend_low_vol": {"orb": 0.15}})
+    reg.register(OpeningRangeBreakout())
+    for g in FIVE_GATES:
+        reg.set_gate("orb", g, True)
+    reg.promote("orb", "live")
+    client = RobinhoodMCPClient(fill_transport())
+    journal = Journal(db.init_db(":memory:"))
+    budget = LLMBudget(db.init_ledger(":memory:"), cfg,
+                       now=lambda: datetime(2026, 6, 15, tzinfo=timezone.utc))
+    llm = LLMClient(cfg, budget, transport)
+    ctrl = Controller(cfg, reg, ConvictionGate(cfg), InsightEngine(cfg, llm_client=llm),
+                      AdaptiveRiskGovernor(cfg), RiskGate(cfg),
+                      ExecutionHandler(client, cfg), journal, mode="full",
+                      llm_client=llm)
+    ctrl.start_session(equity=1500.0)
+    return ctrl, journal
+
+
+class TestFullModePipeline(unittest.TestCase):
+    def test_full_llm_pipeline_executes_trade(self):
+        ctrl, journal = build_full_controller(FullModeTransport(bull=0.85, bear=0.30))
+        run_day(ctrl, orb_win_bars())
+        self.assertGreaterEqual(len(journal.closed_trades()), 1)
+
+    def test_pm_reject_blocks_trade(self):
+        ctrl, journal = build_full_controller(FullModeTransport(pm="reject"))
+        run_day(ctrl, orb_win_bars())
+        self.assertEqual(ctrl.state.trades_today, 0)
+
+    def test_trader_pass_blocks_trade(self):
+        ctrl, journal = build_full_controller(FullModeTransport(trader="pass"))
+        run_day(ctrl, orb_win_bars())
+        self.assertEqual(ctrl.state.trades_today, 0)
+
+
 class TestChaos(unittest.TestCase):
     def test_daily_loss_limit_halts_and_flattens(self):
         ctrl, journal = build_controller()

@@ -60,7 +60,7 @@ class Controller:
     def __init__(self, cfg: dict, registry: StrategyRegistry, gate: ConvictionGate,
                  insight: InsightEngine, governor: AdaptiveRiskGovernor,
                  risk_gate: RiskGate, execution: ExecutionHandler, journal: Journal,
-                 *, mode: str = "rules",
+                 *, mode: str = "rules", llm_client=None,
                  strategy_stats: Optional[Dict[str, StrategyStats]] = None):
         self.cfg = cfg
         self.registry = registry
@@ -71,6 +71,7 @@ class Controller:
         self.execution = execution
         self.journal = journal
         self.mode = mode
+        self.llm = llm_client          # required for mode="full"; None => rules only
         self.strategy_stats = strategy_stats or {}
         self.open: Dict[str, OpenTrade] = {}
         self._oid = 0
@@ -225,7 +226,32 @@ class Controller:
         det = self._signal(setup, ms)
         from .conviction.scorecard import score
         det_score = score(det, self.gate.weights)
-        if self.mode == "full":
+        if self.mode == "full" and self.llm is not None:
+            # §4.4 LLM pipeline: debate -> Stage-2 verdict -> Trader -> PM
+            from .agents.debate import run_debate
+            from .agents.trader import synthesize, pm_decide
+            ctx = {"ticker": setup.ticker, "strategy": setup.strategy,
+                   "side": setup.side, "entry": setup.entry_price,
+                   "stop": setup.stop_price, "factors": setup.factors,
+                   "thesis": thesis.claim, "mechanism": thesis.mechanism,
+                   "regime": ms.regime, "base_rate": thesis.base_rate}
+            debate = run_debate(self.llm, ctx)
+            verdict = self.gate.stage2_verdict(
+                det_score, debate.bull_confidence, debate.bear_confidence,
+                min(1.0, thesis.confidence), 0.7)
+            conviction = verdict["final_conviction"]
+            passes = verdict["passes"]
+            if passes:
+                plan = synthesize(self.llm, {**ctx, "conviction": conviction,
+                                             "debate_margin": debate.margin})
+                if plan.decision != "trade":
+                    return
+                pm = pm_decide(self.llm, {**ctx, "plan": plan.decision,
+                                          "open_positions": len(self.open),
+                                          "day_pnl": self.state.day_pnl})
+                if not pm.approves:
+                    return
+        elif self.mode == "full":
             verdict = self.gate.stage2_verdict(det_score, thesis.confidence, 0.3,
                                                min(1.0, thesis.confidence), 0.7)
             conviction = verdict["final_conviction"]
