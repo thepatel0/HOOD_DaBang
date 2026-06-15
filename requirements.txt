@@ -1,0 +1,34 @@
+# HOOD DaBang dependencies.
+# Phase 0 bedrock needs NONE of these (pure stdlib) — they are for later phases.
+# Brief §23.1 dependency set. Install into a Python 3.11 venv when building
+# Tier-0 analysts and the LLM layer.
+
+# --- Phase 1: Tier-0 analysts (indicators, regime model) ---
+numpy
+pandas
+scipy
+scikit-learn
+hmmlearn
+
+# --- Phase 2: data feeds ---
+yfinance
+feedparser
+httpx
+aiohttp
+pytz
+
+# --- config / validation / logging ---
+pyyaml
+pydantic
+python-dotenv
+loguru
+
+# --- Phase 4: LLM layer + memory embeddings ---
+anthropic
+sentence-transformers
+
+# --- monitoring ---
+rich
+
+# --- dev/test ---
+pytest

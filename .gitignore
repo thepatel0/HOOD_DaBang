@@ -1,0 +1,35 @@
+# Secrets — NEVER commit
+.env
+*.key
+*.pem
+
+# Runtime flags
+HALT.flag
+MANUAL_OVERRIDE.flag
+BUDGET_PAUSE.flag
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Databases & runtime data (regenerated)
+*.db
+*.db-wal
+*.db-shm
+data/cache/
+data/models/*.pkl
+data/models/*.joblib
+logs/*.log
+logs/audit/
+
+# OS
+.DS_Store
+
+# Keep these tracked even though dirs are otherwise data:
+!data/build_status.md
+!data/build_notes/
