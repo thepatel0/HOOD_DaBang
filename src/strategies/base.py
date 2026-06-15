@@ -67,6 +67,20 @@ class MarketState:
     catalyst_sources: int = 0
     gap_pct: Optional[float] = None          # (open - prior_close)/prior_close
     adv_shares: Optional[float] = None
+    rsi2: Optional[float] = None             # fast RSI for mean-reversion swings
+    sma50: Optional[float] = None
+    sma200: Optional[float] = None
+    # strategy-specific context (populated by analysts/feeds; None => strategy abstains)
+    short_interest_pct: Optional[float] = None   # % of float short
+    days_since_earnings: Optional[int] = None
+    is_earnings_today: bool = False
+    sue: Optional[float] = None                  # standardized unexpected earnings
+    rs_rank_pct: Optional[float] = None          # relative-strength rank in sector 0..1
+    guidance_raised: Optional[bool] = None
+    sector: Optional[str] = None
+    sector_is_leader: bool = False               # this name's sector leads today
+    mom_20d: Optional[float] = None              # 20-day price momentum
+    high_20d: Optional[float] = None             # 20-day high
     # freshness (Brief 30.4)
     quote_age_ms: int = 0
     last_bar_age_s: int = 0
