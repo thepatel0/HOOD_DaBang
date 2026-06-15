@@ -62,4 +62,25 @@ Last updated: 2026-06-14 · Build session 1
 
 ## Phase 7 — Monitor, ops lifecycle, integration + chaos tests (§20/23/31.5) — NOT STARTED
 
-## Definition of Done (§35): 0 / 12 items complete — system is PAPER-ONLY until all 12.
+## Phase 3-5 — Backtest, LLM, orchestration (DONE, tested)
+| backtest/engine.py + stats.py + validation.py (5 gates) | ☑ |
+| llm_client.py + llm_budget.py (tier-aware, budget, ledger) | ☑ |
+| insight/engine.py + thesis.py (falsifiable thesis) | ☑ |
+| reconciliation.py · journal.py (persistence) | ☑ |
+| controller.py (full pipeline orchestrator) | ☑ |
+| test_integration.py + test_chaos paths | ☑ |
+| scripts/demo_day.py — runnable end-to-end demo (`make demo`) | ☑ |
+
+**Total: 203 tests green.** Runnable: `make demo` shows a full day → gated,
+thesis-backed, stop-protected, profitable, journaled trade ($0 tokens).
+
+## STILL TO BUILD for full production
+- Data feeds (yfinance OHLCV, news RSS, SEC EDGAR Form 4, FRED, earnings cal)
+- LLM agent layer (news/sentiment/macro/bull/bear/risk/trader/PM/reflector/meta)
+- 18 remaining strategies (VWAP-rev, gap-fill/go, momentum, pairs, swings…)
+- Dashboard (rich), notifications (osascript), ops lifecycle (launchd/recovery)
+- Self-improvement (golden samples, judge, meta-prompter, shadow)
+- Live MCP HTTP transport binding + §34 discovery checkpoint
+
+## Definition of Done (§35): system is PAPER/BACKTEST-ONLY until all 12 items
+green + operator approval. Live capital is the operator's switch, never mine.

@@ -2,7 +2,10 @@
 # The Phase 0/0b bedrock is pure stdlib and also runs under any python3.
 PY ?= .venv/bin/python
 
-.PHONY: test test-v initdb clean
+.PHONY: test test-v initdb clean demo
+
+demo:
+	PYTHONPATH=. $(PY) scripts/demo_day.py
 
 test:
 	PYTHONPATH=. $(PY) -m unittest discover -s tests -t .
