@@ -94,6 +94,26 @@ class TestRiskGate(unittest.TestCase):
         self.assertNotIn("per_trade_risk_exceeds_cap", v.violations)
         self.assertIn("thesis_less_trade_forbidden", v.violations)
 
+    def test_authorized_risk_allows_above_1_5pct(self):
+        # governor authorizes 2.5%; an order risking ~2% must pass (not capped at 1.5%)
+        # risk = $1 * 30 = $30 = 2% of 1500; notional small enough via cheap stock
+        o = base_order(entry_price=20, stop_price=19, shares=30, authorized_risk_pct=0.025)
+        # notional 30*20=600 > 30% of 1500=450 -> would fail position cap; use 15 shares
+        o = base_order(entry_price=10, stop_price=9, shares=22, authorized_risk_pct=0.025)
+        # risk = 1*22 = $22 = 1.47%; notional 220 < 450 ok
+        v = self.gate.check(o, base_acct())
+        self.assertTrue(v.approved, v.violations)
+
+    def test_authorized_risk_cannot_exceed_absolute_ceiling(self):
+        o = base_order(shares=4, authorized_risk_pct=0.05)  # 5% > 2.5% immutable
+        v = self.gate.check(o, base_acct())
+        self.assertIn("authorized_risk_exceeds_absolute_ceiling", v.violations)
+
+    def test_absolute_ceiling_not_overridable(self):
+        o = base_order(shares=4, authorized_risk_pct=0.05)
+        v = self.gate.check(o, base_acct(manual_override=True))
+        self.assertIn("authorized_risk_exceeds_absolute_ceiling", v.violations)
+
     def test_shares_for_risk_floors(self):
         self.assertEqual(RiskGate.shares_for_risk(100, 99, 15), 15)
         self.assertEqual(RiskGate.shares_for_risk(100, 99.5, 15), 30)

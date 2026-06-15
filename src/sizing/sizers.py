@@ -24,21 +24,27 @@ class StrategyStats:
     avg_loss_dollars: float  # positive magnitude
 
 
-def kelly_risk_pct(stats: StrategyStats, cfg: dict) -> float:
-    """Half-Kelly fraction of equity to risk (cap 1.5%). Quarter-Kelly &
-    0.5% floor-default for strategies with <30 trades (Brief 10.1)."""
+def kelly_risk_pct(stats: StrategyStats, cfg: dict, cap_pct: float = None) -> float:
+    """Half-Kelly fraction of equity to risk. Quarter-Kelly & 0.5% floor-default
+    for strategies with <30 trades (Brief 10.1).
+
+    `cap_pct` is the ceiling applied to the result. Defaults to the brief's
+    per_trade_risk_pct (1.5%). The AdaptiveRiskGovernor passes the higher
+    absolute_max_pct (2.5%) so risk can scale on a PROVEN edge — the coupling
+    fix found via functional testing."""
     s = cfg["sizing"]
+    cap = cfg["risk"]["per_trade_risk_pct"] if cap_pct is None else cap_pct
     if stats.n_trades < 30:
         # not enough evidence: quarter-Kelly intent, but never exceed the
         # unproven default risk
-        return min(s["unproven_risk_pct"], cfg["risk"]["per_trade_risk_pct"])
+        return min(s["unproven_risk_pct"], cap)
     if stats.avg_loss_dollars <= 0:
         return s["unproven_risk_pct"]
     p = stats.win_rate
     b = stats.avg_win_dollars / stats.avg_loss_dollars
     f_star = (b * p - (1 - p)) / b
     half_kelly = max(0.0, f_star) * s["kelly_fraction"]
-    return min(half_kelly, cfg["risk"]["per_trade_risk_pct"])
+    return min(half_kelly, cap)
 
 
 def vol_adjusted(base_risk_dollars: float, realized_vol_20d: float, cfg: dict) -> float:

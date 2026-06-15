@@ -87,7 +87,9 @@ class AdaptiveRiskGovernor:
             f = self.cfg["risk"]["per_trade_risk_pct"]
             return RiskDecision(f, {"static": f}, "adaptive_risk disabled; static cap")
 
-        kelly = kelly_risk_pct(ctx.stats, self.cfg)          # already half-Kelly, <=1.5%
+        # half-Kelly, capped at the adaptive ceiling (2.5%) — NOT the 1.5% brief
+        # cap — so a proven edge can size up to the survival bound.
+        kelly = kelly_risk_pct(ctx.stats, self.cfg, cap_pct=self.a["absolute_max_pct"])
         ruin_cap = self.ruin_ceiling(ctx)
         dd_mult = self._dd_throttle(ctx.drawdown_from_ath)
         vol_mult = self._vol_throttle(ctx.realized_vol_20d)

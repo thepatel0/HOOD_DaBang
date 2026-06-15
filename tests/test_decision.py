@@ -127,6 +127,23 @@ class TestAdaptiveRisk(unittest.TestCase):
         self.assertLessEqual(self.gov.decide(ctx).fraction,
                              self.cfg["adaptive_risk"]["nominal_pct"] + 1e-9)
 
+    def test_proven_edge_scales_above_brief_1_5pct(self):
+        # the coupling fix: a strong PROVEN edge must be allowed to exceed 1.5%,
+        # up to the 2.5% absolute ceiling. Kelly here is large; ruin cap 2.5%.
+        ctx = RiskContext(stats=self.proven(win_rate=0.60, avg_win_dollars=2.0),
+                          drawdown_from_ath=0.0, realized_vol_20d=0.12,
+                          n_proven_trades=200, ruin_recommended_fraction=0.025)
+        f = self.gov.decide(ctx).fraction
+        self.assertGreater(f, self.cfg["risk"]["per_trade_risk_pct"])   # > 1.5%
+        self.assertLessEqual(f, self.cfg["adaptive_risk"]["absolute_max_pct"])  # <= 2.5%
+
+    def test_never_exceeds_absolute_ceiling(self):
+        # even with an insane ruin recommendation, clamp at 2.5%
+        ctx = RiskContext(stats=self.proven(win_rate=0.70, avg_win_dollars=3.0),
+                          n_proven_trades=500, ruin_recommended_fraction=0.99)
+        self.assertLessEqual(self.gov.decide(ctx).fraction,
+                             self.cfg["adaptive_risk"]["absolute_max_pct"] + 1e-9)
+
     def test_high_vol_throttles_down(self):
         calm = RiskContext(stats=self.proven(), realized_vol_20d=0.10,
                            n_proven_trades=100, ruin_recommended_fraction=0.015)

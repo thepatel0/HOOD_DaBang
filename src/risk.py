@@ -29,6 +29,9 @@ class OrderProposal:
     last_bar_age_s: int = 0
     has_thesis: bool = True   # Brief: thesis-less trade is illegal (killswitch #26)
     conviction_score: Optional[float] = None  # must clear execution floor
+    authorized_risk_pct: Optional[float] = None  # per-trade cap set by the
+        # AdaptiveRiskGovernor; None => fall back to the brief's per_trade cap.
+        # The gate ALSO enforces an immutable absolute ceiling no governor can pass.
 
 
 @dataclass
@@ -92,9 +95,20 @@ class RiskGate:
         risk_dollars = per_share_risk * o.shares
         notional = o.entry_price * o.shares
 
-        # ---- per-trade caps (Brief 13) -------------------------------------
+        # ---- per-trade caps (Brief 13 + adaptive governor) -----------------
         equity = acct.effective_capital  # sizing uses ramp-limited capital
-        max_risk = self.r["per_trade_risk_pct"] * equity
+        # IMMUTABLE ceiling: the absolute max the adaptive governor may authorize.
+        absolute_max_pct = self.cfg.get("adaptive_risk", {}).get(
+            "absolute_max_pct", self.r["per_trade_risk_pct"])
+        # The cap for THIS trade: what the governor authorized, but never above
+        # the immutable ceiling (a governor bug can't escalate risk past it).
+        authorized = o.authorized_risk_pct
+        if authorized is None:
+            authorized = self.r["per_trade_risk_pct"]
+        if authorized > absolute_max_pct + 1e-9:
+            v.append("authorized_risk_exceeds_absolute_ceiling")
+            authorized = absolute_max_pct
+        max_risk = authorized * equity
         if risk_dollars > max_risk + 1e-9:
             v.append("per_trade_risk_exceeds_cap")
         if notional > self.r["max_position_pct"] * equity + 1e-9:
@@ -126,7 +140,7 @@ class RiskGate:
         # the catastrophic halt or a thesis-less / conviction-less trade ------
         if acct.manual_override:
             HARD = {"thesis_less_trade_forbidden", "missing_conviction_verdict",
-                    "catastrophic_halt"}
+                    "catastrophic_halt", "authorized_risk_exceeds_absolute_ceiling"}
             v = [x for x in v if x in HARD]
 
         approved = len(v) == 0
