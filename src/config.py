@@ -84,6 +84,16 @@ DEFAULTS: Dict[str, Any] = {
         "correlation_cap": 0.70,
         "conviction_size_floor_ratio": 0.6,
     },
+    "adaptive_risk": {  # OPERATOR ADDITION — risk as an optimised, bounded variable
+        "enabled": True,
+        "floor_pct": 0.001,            # never risk less than 0.1% (still participate)
+        "absolute_max_pct": 0.025,     # HARD ceiling; adaptive risk can never exceed
+        "nominal_pct": 0.015,          # the brief's 1.5% baseline
+        "dd_throttle_start_pct": 0.05,  # start scaling risk down at 5% drawdown
+        "dd_throttle_full_pct": 0.20,   # risk -> floor by the 20% drawdown halt
+        "ruin_tolerance": 0.01,        # MC ruin-prob ceiling used to cap sizing
+        "scale_up_requires_trades": 30,  # only size above nominal once proven
+    },
     "latency": {  # Section 30.6
         "intraday_signal_to_order_budget_s": 20,
         "swing_signal_to_order_budget_s": 120,

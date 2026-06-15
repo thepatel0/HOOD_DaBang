@@ -19,7 +19,15 @@ Last updated: 2026-06-14 · Build session 1
 | conviction/gate.py (Stage-1 rank top 1-3 + Stage-2 verdict, §6) | ☑ | ☑ | ☑ 10 | ☑ | ☐ |
 | sizing/sizers.py (Kelly/vol/correlation/conviction, §10) | ☑ | ☑ | ☑ 9 | ☑ | ☐ |
 
-**Phase 0 test total: 69 passing / 69 (100%).** Run: `make test` or
+## Phase 0b — Decision/falsification layer (operator's risk philosophy, $0)
+
+| Component | Researched | Built | Tests written | Tests passing | Operator approved |
+|---|:--:|:--:|:--:|:--:|:--:|
+| decision/hypothesis.py (FalsificationEngine, permutation test) | ☑ | ☑ | ☑ | ☑ | ☐ |
+| decision/monte_carlo.py (ruin sim + ruin-constrained optimal risk) | ☑ | ☑ | ☑ | ☑ | ☐ |
+| decision/adaptive_risk.py (risk as a bounded, optimised variable) | ☑ | ☑ | ☑ | ☑ | ☐ |
+
+**Phase 0 + 0b test total: 84 passing / 84 (100%).** Run: `make test` or
 `PYTHONPATH=. python3 -m unittest discover -s tests -t .`
 
 ## Phase 1 — Tier-0 analysts (deterministic, needs numpy/pandas) — NOT STARTED
