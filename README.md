@@ -1,49 +1,77 @@
 # HOOD DaBang
 
-An autonomous, multi-agent, hybrid **AI + rules** equities trading desk in
-software that prizes trade **quality over quantity**. Built to the v7 FINAL brief
-(`HOOD_DABANG_v7_FINAL.md`). Capital $1,500, US equities, one operator who will
-not watch the screen.
+An autonomous, multi-agent, hybrid **AI + rules** US-equities trading desk that
+prizes trade **quality over quantity**. Built to the v7 FINAL brief (`BRIEF.md`).
+Capital $1,500, Robinhood Agentic MCP, one operator who will not watch the screen.
 
-> **Status: BUILD IN PROGRESS — paper/build only.** No real capital. The system
-> is not "done" until all 12 Definition-of-Done items (brief §35) are green.
-> See `data/build_status.md`.
+> **Status: architecture COMPLETE — 430 tests green.** PAPER/BACKTEST-ONLY until
+> the 12-point Definition of Done (§35) is satisfied + operator approval. Going
+> live with real capital is the operator's switch, never the agent's.
 
-## What runs today (Phase 0 — token-free deterministic bedrock)
-Pure standard library, **zero pip installs, $0, zero LLM tokens**:
-- `src/config.py` — canonical parameters (§32) + fail-closed validation
-- `src/token_decision_engine.py` — the **$0-first routing brain**: decides what
-  can be done for free in Python vs what genuinely needs a paid model, and
-  refuses to escalate when the budget says no
-- `src/event_bus.py` — priority FIFO; `KillEvent` jumps the queue
-- `src/db.py` — SQLite WAL schema (§33)
-- `src/risk.py` — the risk gate; every order passes through (§13)
-- `src/killswitch.py` — the killswitch registry (§14 + §30.7)
-- `src/conviction/` — Conviction Gate Stage-1 scorecard + hard floors + rank (§6)
-- `src/sizing/` — Kelly / vol-target / conviction-scaled sizing (§10)
-
-## Run the tests (no installs needed)
+## Quick start
 ```bash
 cd hood-dabang
-make test          # or:
-PYTHONPATH=. python3 -m unittest discover -s tests -t .
+make test          # 430 tests (uses the 3.13 venv)
+make demo          # one synthetic day through the full pipeline
+PYTHONPATH=. .venv/bin/python -m src.run_live --paper --once   # real data, paper
+PYTHONPATH=. .venv/bin/python scripts/validate_strategy.py --ticker SPY --strategy orb
 ```
-Phase 0: **69 tests, all green.**
 
-## Token philosophy (why this is cheap)
-Everything deterministic — math, parsing, rules, ML inference — is **Tier 0**
-local Python and never touches a model. Paid models are reached only for the top
-1-3 Conviction-Gate survivors, cheapest-tier-first, cache-first, budget-gated.
-The brief targets ~$1.80/day of LLM spend against a $5/day hard killswitch.
+## What it is
+A trading desk in software: ~13 specialized agents (most deterministic Python, a
+few LLM-backed) coordinated by an event-driven controller, with layered memory, a
+self-improvement loop, hard survival rails, a **Conviction Gate** that is
+comfortable doing nothing, and an **Insight Engine** that requires every trade to
+be a falsifiable thesis (mechanism + invalidation) before entry.
 
-## Roadmap
-Phases 1-7 in `data/build_status.md`: Tier-0 analysts (numpy/hmmlearn) → data
-feeds → MCP discovery + execution → LLM agents → 19 strategies behind the five
-validation gates → backtest/memory/self-improvement → dashboard + ops + chaos
-tests → paper day → reduced-capital live ramp ($300 first, not $1,500).
+## Architecture (all built + tested)
+- **Bedrock ($0, deterministic):** config+validation, token decision engine, event
+  bus, SQLite-WAL DB, risk gate, 29-killswitch registry, Conviction Gate (Stage
+  1+2), Kelly/vol/conviction sizing.
+- **Risk as a variable:** `AdaptiveRiskGovernor` = min(half-Kelly, Monte-Carlo
+  ruin-ceiling) × drawdown/vol throttles, bounded [0.1%, 2.5%], maturity-gated.
+  Every change must survive the `FalsificationEngine` (reject the null, p<0.05).
+- **19 strategies** + registry (five-gate live-lock, signal router).
+- **Tier-0 analysts:** technical (numpy), microstructure, insider, regime (HMM+RF).
+- **Execution:** schema-validated MCP client + live JSON-RPC HTTP transport +
+  atomic-entry handler (2s stop-or-flatten) + reconciliation.
+- **Data feeds:** yfinance bars, news RSS, SEC Form 4, FRED, earnings — cached,
+  degrade-safe.
+- **Backtest + 5 validation gates** (walk-forward, bootstrap PBO, Deflated Sharpe,
+  OOS) — strictly no-look-ahead.
+- **LLM layer:** tier-aware client + budget + ledger; insight, news, sentiment,
+  macro, fundamentals, bull/bear debate, trader, PM, reflector, discoverer,
+  meta-learner — all structured-output, fail-closed, prompt-injection-defended.
+- **Memory:** 4 layers, recency×relevance×importance, weekly consolidation.
+- **Self-improvement:** golden samples, judge, shadow mode, meta-prompter, and the
+  **recursive constraint** (can never modify risk/killswitch/reconciliation/tests/
+  gate-floors — structurally enforced).
+- **Orchestration:** controller (rules mode AND full LLM mode), research pipeline,
+  screener, weekly review.
+- **Monitoring/ops:** rich dashboard, notifications, P&L-velocity/feed/order-rate
+  health monitors, self-test suite, startup gating, launchd, operator slash commands.
+
+## Token philosophy
+Everything deterministic — math, parsing, rules, ML inference — is **Tier 0** local
+Python ($0). Paid models are reached only for the top 1-3 Conviction-Gate
+survivors, cheapest-tier-first, cache-first, budget-gated. Target ~$1.80/day vs a
+$5/day hard killswitch. The `TokenDecisionEngine` makes this an auditable runtime
+decision, not a static rule.
+
+## The honesty mechanism
+On **real SPY data**, a raw ORB strategy fails all four backtest gates — and the
+system correctly **refuses to let it trade**. Backtest Sharpe predicts live at
+R²<0.025, so most strategies *should* fail; the five gates are how you find out
+before risking capital. Run `scripts/validate_strategy.py` to test any strategy.
+
+## Before live (operator)
+1. Push to GitHub (`gh auth login`, then `git push`).
+2. §34 MCP discovery: `client.discover()` against the real server; set
+   `ROBINHOOD_MCP_TOKEN`. The wrapper halts on tool-name mismatch.
+3. Prove edges through the five gates on real data; only gate-passers go `live`.
+4. Work the 12-point Definition of Done, then `run_live --live --arm-live`.
 
 ## Safety stance
 The rule layer is bedrock; the AI layer is judgment *inside* it. An LLM can never
-override a risk cap, a killswitch, a position limit, a budget cap, or a
-Conviction-Gate floor. Live capital only after §35 is fully green and the
-operator explicitly approves a paper day's results.
+override a risk cap, killswitch, position limit, budget cap, or Conviction-Gate
+floor. See `data/build_status.md` for the full component ledger.

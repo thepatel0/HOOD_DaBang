@@ -1,0 +1,21 @@
+# HOOD DaBang — exact versions verified working on Python 3.13.8 (macOS).
+# The bedrock needs NONE of these (pure stdlib). These are for Tier-0 analytics,
+# data feeds, the live MCP transport, and the dashboard.
+#
+# Setup:
+#   /usr/local/opt/python@3.13/bin/python3.13 -m venv .venv
+#   .venv/bin/pip install -r requirements-lock.txt
+#
+# Not yet installed (needed only for the live LLM path, when the operator wires it):
+#   anthropic            # AnthropicTransport (live LLM calls)
+#   sentence-transformers # optional upgrade for memory embeddings (hashing default works)
+
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.9.0
+hmmlearn==0.3.3
+yfinance==1.4.1
+feedparser==6.0.12
+httpx==0.28.1
+rich==15.0.0
