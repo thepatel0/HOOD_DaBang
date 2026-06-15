@@ -113,7 +113,9 @@ class PairsStatArb(Strategy):
         return Action(ActionType.HOLD)
 
     def should_exit_pair(self, z: float) -> Optional[str]:
-        if abs(z) <= self.exit_z + 0.1:
+        # exit when the spread has reverted toward 0 (within ~0.5 sigma) or hit
+        # the divergence stop at 3 sigma.
+        if abs(z) <= self.exit_z + 0.5:
             return "spread_reverted"
         if abs(z) >= self.stop_z:
             return "spread_stop_3sigma"

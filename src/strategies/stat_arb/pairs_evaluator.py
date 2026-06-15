@@ -52,6 +52,13 @@ class PairsEvaluator:
         z = rolling_zscore(spread)
         key = self._key(a, b)
         if z is None:
+            # z is undefined either from too little data OR a fully converged
+            # (zero-variance) spread. For an OPEN pair with enough data, a
+            # converged spread is the ultimate reversion -> exit.
+            if key in self.open and len(spread) >= 20:
+                op = self.open.pop(key)
+                return PairDecision((a, b), "exit", 0.0, op.long_leg, op.short_leg,
+                                    "spread_reverted")
             return PairDecision((a, b), "hold", 0.0, reason="insufficient_data")
 
         # manage an existing pair position
