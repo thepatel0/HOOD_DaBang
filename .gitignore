@@ -33,3 +33,4 @@ logs/audit/
 # Keep these tracked even though dirs are otherwise data:
 !data/build_status.md
 !data/build_notes/
+.venv/

@@ -30,14 +30,27 @@ Last updated: 2026-06-14 · Build session 1
 **Phase 0 + 0b test total: 84 passing / 84 (100%).** Run: `make test` or
 `PYTHONPATH=. python3 -m unittest discover -s tests -t .`
 
-## Phase 1 — Tier-0 analysts (deterministic, needs numpy/pandas) — NOT STARTED
-| technical.py · microstructure.py · insider.py · regime.py (HMM+RF) | ☐ |
+## Phase 1 — Strategy framework + Tier-0 analysts
 
-## Phase 2 — Data feeds (free sources, caching, degradation, §17) — NOT STARTED
+| Component | Built | Tests passing |
+|---|:--:|:--:|
+| strategies/base.py (Strategy ABC, MarketState, Setup, Action, WakeCondition) | ☑ | ☑ |
+| strategies/registry.py (five-gate live lock, §30.1 signal router) | ☑ | ☑ |
+| strategies/intraday/orb.py (Opening Range Breakout, full scan+manage) | ☑ | ☑ |
+| analysts_local/technical.py (EMA/RSI/ATR/VWAP/MACD/BBwidth/OR, numpy) | ☑ | ☑ |
+| analysts_local/microstructure.py · insider.py · regime.py (HMM+RF) | ☐ | ☐ |
+| Remaining 18 strategies | ☐ | ☐ |
+
+## Phase 2 — MCP + execution
+
+| Component | Built | Tests passing |
+|---|:--:|:--:|
+| mcp_client.py (typed, schema-validated, pluggable transport, §34) | ☑ | ☑ |
+| execution.py (atomic entry, idempotent, conviction/thesis gates, §30.3) | ☑ | ☑ |
+| reconciliation.py · live HTTP MCP transport binding | ☐ | ☐ |
+
+## Phase 2b — Data feeds (free sources, caching, degradation, §17) — NOT STARTED
 | yfinance · news_rss · sec_edgar · finra_short · fred · earnings_cal | ☐ |
-
-## Phase 3 — MCP discovery + execution (§34/26.6) — BLOCKED (needs live MCP) — NOT STARTED
-| mcp_client.py · execution.py (atomic entry, §30.3) · reconciliation.py | ☐ |
 
 ## Phase 4 — LLM layer (needs ANTHROPIC_API_KEY, §3/5) — NOT STARTED
 | llm_client.py · llm_budget.py · the 15 agents (Tiers 1-3) | ☐ |
