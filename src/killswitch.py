@@ -43,6 +43,13 @@ class KillswitchState:
     llm_daily_budget: float = 5.0
     llm_monthly_spent: float = 0.0
     llm_monthly_budget: float = 60.0
+    # live feeds (Brief §13/§17)
+    mcp_heartbeat_age_s: float = 0.0            # #4
+    data_feed_stale_age_s: float = 0.0          # #6
+    has_open_position: bool = False
+    quote_spike_unexplained: bool = False       # #11 >10% in 5s w/o vol+news
+    pnl_velocity_anomaly: bool = False          # #13
+    order_rate_excessive: bool = False          # #17 amplification
     # integrity / safety
     reconciliation_desync: bool = False
     self_test_failed: bool = False
@@ -79,9 +86,21 @@ _RULES: List = [
     (3, "catastrophic",
      lambda s: s.equity <= s.catastrophic_floor,
      HaltScope.HALT_INDEFINITE, "equity <= catastrophic floor ($1,050)"),
+    (4, "mcp_failure",
+     lambda s: s.mcp_heartbeat_age_s > 60,
+     HaltScope.HALT_SESSION, "MCP heartbeat failed > 60s"),
     (5, "reconciliation_desync",
      lambda s: s.reconciliation_desync,
      HaltScope.HALT_SESSION, "broker vs internal desync > 1 cycle"),
+    (6, "stale_feed_open_position",
+     lambda s: s.has_open_position and s.data_feed_stale_age_s > 30,
+     HaltScope.PAUSE_NEW_ORDERS, "data feed stale > 30s with an open position"),
+    (11, "unexplained_quote_spike",
+     lambda s: s.quote_spike_unexplained,
+     HaltScope.PAUSE_TICKER, "quote moved >10% in 5s without volume + news"),
+    (13, "pnl_velocity_anomaly",
+     lambda s: s.pnl_velocity_anomaly,
+     HaltScope.PAUSE_NEW_ORDERS, "P&L velocity anomaly (>3sigma) — verify state"),
     (8, "halt_flag",
      lambda s: s.halt_flag,
      HaltScope.HALT_SESSION, "HALT.flag present"),
@@ -98,6 +117,9 @@ _RULES: List = [
     (14, "order_to_non_watchlist",
      lambda s: s.order_to_non_watchlist,
      HaltScope.PAUSE_NEW_ORDERS, "order to ticker not on today's watchlist"),
+    (17, "order_rate_amplification",
+     lambda s: s.order_rate_excessive,
+     HaltScope.PAUSE_NEW_ORDERS, "order rate exceeds history (amplification freeze)"),
     (15, "self_test_failure",
      lambda s: s.self_test_failed,
      HaltScope.HALT_SESSION, "a self-test failed"),
