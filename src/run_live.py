@@ -19,10 +19,7 @@ from typing import Dict, List
 
 from . import config as cfgmod
 from . import db
-from .strategies.registry import StrategyRegistry, FIVE_GATES
-from .strategies.intraday.orb import OpeningRangeBreakout
-from .strategies.intraday.vwap_reversion import VWAPReversion
-from .strategies.intraday.momentum import RelativeVolumeMomentum
+from .strategies.all import build_full_registry
 from .analysts_local.technical import TechnicalAnalyst
 from .conviction.gate import ConvictionGate
 from .insight.engine import InsightEngine
@@ -55,14 +52,9 @@ def _sim_transport() -> MockTransport:
 
 
 def build_system(cfg, mode: str):
-    reg = StrategyRegistry(regime_allocations={
-        "bull_trend_low_vol": {"orb": 0.15, "momentum": 0.12, "vwap_reversion": 0.05},
-        "range_low_vol": {"vwap_reversion": 0.20, "orb": 0.05, "momentum": 0.05},
-    })
-    for strat in (OpeningRangeBreakout(), VWAPReversion(), RelativeVolumeMomentum()):
-        reg.register(strat)
-        # paper mode for the demo; live promotion requires all five gates
-        reg.promote(strat.name, "paper")
+    # all 19 strategies; intraday set 'paper' (tradeable in sim), swing stay in
+    # development until Day 30. Live promotion still requires all five gates.
+    reg = build_full_registry(activation="paper")
 
     if mode == "live":
         from .mcp_http import HttpMCPTransport
