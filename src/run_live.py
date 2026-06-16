@@ -126,15 +126,51 @@ def run_once(tickers: List[str], mode: str = "paper") -> None:
     print(render(snap))
 
 
+def run_app_cycle(tickers: List[str], app_mode: str) -> None:
+    """Application-based path: build the integrated system (isolated prod/paper
+    environments + shared knowledge) and run one research or paper cycle on real
+    data, then print the summary + status."""
+    from .app import Application
+    cfg = cfgmod.load()
+    base = os.path.join(PROJECT_DIR, "data")
+    app = Application(cfg, base, bar_feed=CachedBarFeed(ttl_s=300))
+    now = "2026-06-15T09:50:00-04:00"
+
+    if app_mode == "paper":
+        app.control.app(True)
+        app.control.paper(True)
+        summary, report = app.paper_cycle(tickers, now)
+        print("PAPER cycle:", summary.notes)
+        print("Learning:", report.notes)
+    else:  # research -> recommend-only on the production environment
+        app.control.app(True)
+        app.control.research(True)
+        summary = app.research_cycle(tickers, now)
+        print("RESEARCH cycle:", summary.notes,
+              f"-> {summary.recommendations} recommendation(s)")
+
+    print("Status:", app.status())
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="HOOD DaBang trading controller")
     p.add_argument("--paper", action="store_true", help="paper/sim mode (default)")
     p.add_argument("--live", action="store_true", help="LIVE — requires arming")
     p.add_argument("--once", action="store_true", help="run a single pipeline pass")
     p.add_argument("--watchlist", default=",".join(DEFAULT_WATCHLIST))
+    p.add_argument("--mode", choices=("research", "paper"),
+                   help="Application path: research (recommend-only, production env) "
+                        "or paper (isolated sandbox + learning loop)")
     p.add_argument("--arm-live", action="store_true",
                    help="explicit confirmation required to trade real capital")
     args = p.parse_args(argv)
+
+    tickers = [t.strip().upper() for t in args.watchlist.split(",") if t.strip()]
+
+    # Application-based path (integrated control plane + isolated environments)
+    if args.mode:
+        run_app_cycle(tickers, args.mode)
+        return 0
 
     mode = "live" if args.live else "paper"
     if mode == "live" and not args.arm_live:
@@ -142,7 +178,6 @@ def main(argv=None) -> int:
               "green. Refusing. Run --paper to validate first.")
         return 2
 
-    tickers = [t.strip().upper() for t in args.watchlist.split(",") if t.strip()]
     if args.once or mode == "paper":
         run_once(tickers, mode)
         return 0
