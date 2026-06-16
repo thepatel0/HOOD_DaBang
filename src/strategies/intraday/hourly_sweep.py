@@ -42,6 +42,8 @@ class HourlySweep(Strategy):
         if len(bars) < 30 or ms.atr_1m is None:
             return []
         cur_hour = _hour_key(ms.now_et)
+        if not cur_hour.isdigit():
+            return []                       # malformed/absent timestamp -> abstain
         cur_bars = [b for b in bars if _hour_key(b.ts) == cur_hour]
         prior_hour = f"{int(cur_hour) - 1:02d}"
         prior_bars = [b for b in bars if _hour_key(b.ts) == prior_hour]
