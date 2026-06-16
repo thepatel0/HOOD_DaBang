@@ -60,7 +60,8 @@ class Controller:
     def __init__(self, cfg: dict, registry: StrategyRegistry, gate: ConvictionGate,
                  insight: InsightEngine, governor: AdaptiveRiskGovernor,
                  risk_gate: RiskGate, execution: ExecutionHandler, journal: Journal,
-                 *, mode: str = "rules", llm_client=None,
+                 *, mode: str = "rules", llm_client=None, execution_mode: str = "execute",
+                 env_name: str = "production",
                  strategy_stats: Optional[Dict[str, StrategyStats]] = None):
         self.cfg = cfg
         self.registry = registry
@@ -71,9 +72,14 @@ class Controller:
         self.execution = execution
         self.journal = journal
         self.mode = mode
+        # execution_mode: "execute" (place orders — paper or live, via the wired
+        # handler/env) or "recommend" (research only — write recommendation, no order)
+        self.execution_mode = execution_mode
+        self.env_name = env_name
         self.llm = llm_client          # required for mode="full"; None => rules only
         self.strategy_stats = strategy_stats or {}
         self.open: Dict[str, OpenTrade] = {}
+        self.recommendations_today = 0
         self._oid = 0
 
     # ----- killswitch ---------------------------------------------------- #
@@ -293,6 +299,24 @@ class Controller:
             gross_exposure=self._gross_exposure(), day_number=self.state.day_number)
         verdict = self.risk_gate.check(proposal, acct)
         if not verdict.approved:
+            return
+
+        # RESEARCH (recommend-only) mode: write the recommendation to the journal +
+        # memory instead of placing any order. No execution, no position.
+        if self.execution_mode == "recommend":
+            tid = self.journal.record_thesis(thesis, now_et)
+            self.journal.record_recommendation(
+                ts=now_et, ticker=setup.ticker, side=setup.side,
+                strategy=setup.strategy, entry=setup.entry_price,
+                stop=setup.stop_price,
+                target=setup.targets[0][0] if setup.targets else None,
+                shares=shares, conviction=conviction, thesis_id=tid,
+                regime=ms.regime, mechanism=thesis.mechanism,
+                invalidation="; ".join(thesis.invalidation), env=self.env_name)
+            self.journal.log_conviction(now_et, setup.ticker, setup.strategy,
+                                        det_score, conviction, True, False,
+                                        "recommended_not_traded")
+            self.recommendations_today += 1
             return
 
         self._oid += 1

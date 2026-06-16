@@ -105,6 +105,29 @@ class Journal:
         return [dict(zip(["id", "ticker", "strategy", "pnl_r", "pnl_dollars",
                           "exit_reason"], r)) for r in rows]
 
+    # ----- recommendations (research mode) ------------------------------- #
+    def record_recommendation(self, *, ts: str, ticker: str, side: str,
+                              strategy: str, entry: float, stop: float,
+                              target: Optional[float], shares: int,
+                              conviction: float, thesis_id: str, regime: str,
+                              mechanism: str, invalidation: str,
+                              env: str = "production") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO recommendations (ts, ticker, side, strategy, entry, stop, "
+            "target, shares, conviction, thesis_id, regime, mechanism, invalidation, "
+            "env) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ts, ticker, side, strategy, entry, stop, target, shares, conviction,
+             thesis_id, regime, mechanism, invalidation, env))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def recent_recommendations(self, limit: int = 10) -> List[dict]:
+        rows = self.conn.execute(
+            "SELECT ts, ticker, side, strategy, conviction, mechanism FROM "
+            "recommendations ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(zip(["ts", "ticker", "side", "strategy", "conviction",
+                          "mechanism"], r)) for r in rows]
+
     # ----- equity curve -------------------------------------------------- #
     def update_equity(self, ts: str, equity: float, daily_pnl: float,
                       drawdown_from_ath: float, ath: float,

@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS build_status (
   researched INTEGER, built INTEGER, tests_written INTEGER,
   tests_passing INTEGER, operator_approved INTEGER, notes TEXT, updated_ts TEXT
 );
+
+-- Research-mode output: decisions written here (and to memory) instead of orders.
+CREATE TABLE IF NOT EXISTS recommendations (
+  id INTEGER PRIMARY KEY,
+  ts TEXT, ticker TEXT, side TEXT, strategy TEXT,
+  entry REAL, stop REAL, target REAL, shares INTEGER,
+  conviction REAL, thesis_id TEXT, regime TEXT,
+  mechanism TEXT, invalidation TEXT, env TEXT,   -- env: production|paper
+  followed INTEGER DEFAULT 0                       -- did a real trade follow it?
+);
 """
 
 LEDGER_SCHEMA = """

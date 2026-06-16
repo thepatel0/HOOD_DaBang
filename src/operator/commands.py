@@ -14,18 +14,30 @@ from typing import Callable, Dict, List, Optional
 
 
 class CommandRouter:
-    def __init__(self, controller=None, journal=None, budget=None, registry=None):
+    def __init__(self, controller=None, journal=None, budget=None, registry=None,
+                 control=None):
         self.ctrl = controller
         self.journal = journal
         self.budget = budget
         self.registry = registry
+        self.control = control          # ControlPlane (operating mode on/off)
         self._h: Dict[str, Callable[[List[str]], str]] = {
             "status": self._status, "halt": self._halt, "resume": self._resume,
             "flatten": self._flatten, "why": self._why, "thesis": self._thesis,
             "risk": self._risk, "conviction": self._conviction,
             "rejected": self._rejected, "why-no-trade": self._why_no_trade,
             "budget": self._budget, "strategy": self._strategy, "help": self._help,
+            # operating-mode command & control
+            "app": self._app, "research": self._research, "paper": self._paper,
+            "trading": self._trading, "mode": self._mode,
+            "recommendations": self._recommendations, "recommend": self._recommendations,
         }
+
+    def _onoff(self, args: List[str]) -> Optional[bool]:
+        if not args:
+            return None
+        return True if args[0].lower() in ("on", "start", "enable") else (
+            False if args[0].lower() in ("off", "stop", "disable") else None)
 
     def dispatch(self, line: str) -> str:
         line = line.strip().lstrip("/")
@@ -110,9 +122,59 @@ class CommandRouter:
                 f"| cache {self.budget.cache_hit_rate():.0%}")
 
     def _help(self, args) -> str:
-        return ("commands: /status /risk /conviction /rejected /why-no-trade "
-                "/why <id> /thesis <id> /budget /halt /resume /flatten "
-                "/strategy <name> on|off")
+        return ("CONTROL: /app on|off  /research on|off  /paper on|off  "
+                "/trading arm  /trading on|off  /mode\n"
+                "INFO: /status /risk /conviction /rejected /why-no-trade "
+                "/why <id> /thesis <id> /recommendations /budget\n"
+                "ACTIONS: /halt /resume /flatten /strategy <name> on|off")
+
+    # ----- operating-mode command & control ------------------------------ #
+    def _mode(self, args) -> str:
+        if not self.control:
+            return "no control plane wired"
+        return self.control.describe()
+
+    def _app(self, args) -> str:
+        on = self._onoff(args)
+        if on is None or not self.control:
+            return "usage: /app on|off"
+        return self.control.app(on).message
+
+    def _research(self, args) -> str:
+        on = self._onoff(args)
+        if on is None or not self.control:
+            return "usage: /research on|off"
+        return self.control.research(on).message
+
+    def _paper(self, args) -> str:
+        on = self._onoff(args)
+        if on is None or not self.control:
+            return "usage: /paper on|off"
+        return self.control.paper(on).message
+
+    def _trading(self, args) -> str:
+        if not self.control:
+            return "no control plane wired"
+        if args and args[0].lower() == "arm":
+            r = self.control.arm_trading()
+        else:
+            on = self._onoff(args)
+            if on is None:
+                return "usage: /trading arm | /trading on|off"
+            r = self.control.trading(on)
+        msg = r.message
+        if r.blockers:
+            msg += "\n  blockers:\n" + "\n".join(f"    - {b}" for b in r.blockers)
+        return msg
+
+    def _recommendations(self, args) -> str:
+        if not self.journal:
+            return "no journal"
+        recs = self.journal.recent_recommendations(10)
+        if not recs:
+            return "no recommendations yet (research mode writes them here)"
+        return "\n".join(f"  {r['ts'][:16]} {r['ticker']} {r['side']} {r['strategy']} "
+                         f"conv={r['conviction']:.0f} — {r['mechanism'][:60]}" for r in recs)
 
     # ----- mutating ------------------------------------------------------ #
     def _halt(self, args) -> str:
