@@ -61,7 +61,7 @@ class Controller:
                  insight: InsightEngine, governor: AdaptiveRiskGovernor,
                  risk_gate: RiskGate, execution: ExecutionHandler, journal: Journal,
                  *, mode: str = "rules", llm_client=None, execution_mode: str = "execute",
-                 env_name: str = "production",
+                 env_name: str = "production", knowledge_base=None,
                  strategy_stats: Optional[Dict[str, StrategyStats]] = None):
         self.cfg = cfg
         self.registry = registry
@@ -76,6 +76,9 @@ class Controller:
         # handler/env) or "recommend" (research only — write recommendation, no order)
         self.execution_mode = execution_mode
         self.env_name = env_name
+        # shared KnowledgeBase: validated paper patterns tilt conviction (bounded);
+        # None => bedrock scorecard only (paper/prod isolation otherwise intact)
+        self.knowledge_base = knowledge_base
         self.llm = llm_client          # required for mode="full"; None => rules only
         self.strategy_stats = strategy_stats or {}
         self.open: Dict[str, OpenTrade] = {}
@@ -268,6 +271,12 @@ class Controller:
             penalty = max(0.0, gap - 0.2) * 20
             conviction = det_score - penalty
             passes = conviction >= self.gate.effective_execution_floor
+
+        # validated-knowledge tilt (bounded ±5): the only paper->prod signal
+        if self.knowledge_base is not None:
+            conviction = max(0.0, min(100.0, conviction +
+                             self.knowledge_base.conviction_tilt(setup.strategy, ms.regime)))
+
         if not passes:
             return
 
