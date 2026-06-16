@@ -44,6 +44,10 @@ class AccountState:
     gross_exposure: float               # sum |position notional| currently open
     day_number: int = 1                 # live day counter (ramp/concurrency)
     manual_override: bool = False       # MANUAL_OVERRIDE.flag present
+    # Deployment cap (NEXT_STEPS P3): total deployed notional must not exceed
+    # deployment_cap_usd unless the operator passcode set deployment_cap_override.
+    deployment_cap_usd: float = 500.0
+    deployment_cap_override: bool = False
 
 
 @dataclass
@@ -125,6 +129,13 @@ class RiskGate:
         if acct.gross_exposure + notional > self.r["total_exposure_cap_pct"] * equity + 1e-9:
             v.append("total_exposure_cap_exceeded")
 
+        # ---- deployment cap (NEXT_STEPS P3): hard $-cap on total deployed ----
+        # capital. Overridable ONLY by the operator passcode (sets
+        # deployment_cap_override); never by any agent.
+        if not acct.deployment_cap_override:
+            if acct.gross_exposure + notional > acct.deployment_cap_usd + 1e-9:
+                v.append("deployment_cap_exceeded")
+
         # ---- account-level halts -------------------------------------------
         if acct.equity <= self.r["catastrophic_halt_equity_usd"]:
             v.append("catastrophic_halt")                      # killswitch #3
@@ -140,7 +151,8 @@ class RiskGate:
         # the catastrophic halt or a thesis-less / conviction-less trade ------
         if acct.manual_override:
             HARD = {"thesis_less_trade_forbidden", "missing_conviction_verdict",
-                    "catastrophic_halt", "authorized_risk_exceeds_absolute_ceiling"}
+                    "catastrophic_halt", "authorized_risk_exceeds_absolute_ceiling",
+                    "deployment_cap_exceeded"}  # cap lifts only via passcode override
             v = [x for x in v if x in HARD]
 
         approved = len(v) == 0

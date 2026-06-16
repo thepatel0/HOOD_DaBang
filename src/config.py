@@ -49,6 +49,7 @@ DEFAULTS: Dict[str, Any] = {
         "trade_frequency_cap": 25,
         "consecutive_loss_cooldown": 5,
         "consecutive_loss_halt_day": 8,
+        "deployment_cap_usd": 500.0,   # NEXT_STEPS P3: hard $-cap on deployed capital
     },
     "conviction": {  # Section 6
         "stage1_hard_floor": 65,
@@ -250,5 +251,24 @@ def load(path: str = None) -> Dict[str, Any]:
         except ImportError:
             # pyyaml not installed: bedrock still runs on canonical defaults.
             pass
+    validate(cfg)
+    return cfg
+
+
+def for_balance(balance: float, base: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Return a config recalibrated to the ACTUAL account balance. The brief's
+    defaults assume $1,500; a real $1,000 account needs the catastrophic floor,
+    capital ramp, and deployment cap rescaled — otherwise the $1,050 floor would
+    sit ABOVE a $1,000 balance and halt every trade. Used by the live/production
+    path; tests keep the $1,500 default."""
+    cfg = copy.deepcopy(base) if base is not None else load()
+    cfg["account"]["starting_capital_usd"] = balance
+    cfg["risk"]["catastrophic_halt_equity_usd"] = round(0.70 * balance, 2)
+    cfg["risk"]["deployment_cap_usd"] = min(500.0, 0.50 * balance)
+    cr = cfg["capital_ramp"]
+    cr["live_days_1_5_usd"] = round(0.25 * balance)
+    cr["live_days_6_15_usd"] = round(0.50 * balance)
+    cr["live_days_16_30_usd"] = round(0.75 * balance)
+    cr["live_day_31_plus_usd"] = round(balance)
     validate(cfg)
     return cfg
